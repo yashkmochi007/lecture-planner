@@ -44,7 +44,7 @@ export function PlannerPanel({
           new Date(p.date) <
             new Date(new Date().setDate(new Date().getDate() - 1)) &&
           p.lectures.some((l) => !l.completed)
-      ) && (
+      ).length > 0 && (
         <div className="mt-4">
           <h3 className="font-medium">Overdue</h3>
           <div className="space-y-2 mt-2 text-sm">
