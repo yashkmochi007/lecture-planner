@@ -1,4 +1,5 @@
-import type { Config, Lecture, StoredState } from '../types/index';
+import type { Config, Lecture } from '../types/index';
+
 
 export const LOCAL_KEY = "lecture_planner_v1";
 
@@ -10,7 +11,7 @@ export function defaultConfig(): Config {
     return {
         weekdayHours: 2,
         weekendHours: 8,
-        startDate: "2025-09-01", // default start date
+        startDate: new Date().toISOString().slice(0, 10)
     };
 }
 
@@ -21,38 +22,38 @@ export function sortLectures(arr: Lecture[]): Lecture[] {
     });
 }
 
-export function loadFromLocal(): StoredState | null {
-    try {
-        const raw = localStorage.getItem(LOCAL_KEY);
-        if (!raw) {
-            console.log('No saved state found');
-            return null;
-        }
-        const parsed = JSON.parse(raw) as StoredState;
-        if (!parsed || !Array.isArray(parsed.lectures)) {
-            console.log('Invalid saved state format');
-            return null;
-        }
-        console.log(`Loaded ${parsed.lectures.length} lectures from storage`);
-        return parsed;
-    } catch (e) {
-        console.error("Failed to load local state", e);
-        return null;
-    }
-}
+// export function loadFromLocal(): StoredState | null {
+//     try {
+//         const raw = localStorage.getItem(LOCAL_KEY);
+//         if (!raw) {
+//             console.log('No saved state found');
+//             return null;
+//         }
+//         const parsed = JSON.parse(raw) as StoredState;
+//         if (!parsed || !Array.isArray(parsed.lectures)) {
+//             console.log('Invalid saved state format');
+//             return null;
+//         }
+//         console.log(`Loaded ${parsed.lectures.length} lectures from storage`);
+//         return parsed;
+//     } catch (e) {
+//         console.error("Failed to load local state", e);
+//         return null;
+//     }
+// }
 
-export function saveToLocal(state: StoredState): void {
-    try {
-        if (!state || !Array.isArray(state.lectures)) {
-            console.error("Invalid state format", state);
-            return;
-        }
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
-        console.log(`Saved ${state.lectures.length} lectures to storage`);
-    } catch (e) {
-        console.error("Failed to save local state", e);
-    }
-}
+// export function saveToLocal(state: StoredState): void {
+//     try {
+//         if (!state || !Array.isArray(state.lectures)) {
+//             console.error("Invalid state format", state);
+//             return;
+//         }
+//         localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+//         console.log(`Saved ${state.lectures.length} lectures to storage`);
+//     } catch (e) {
+//         console.error("Failed to save local state", e);
+//     }
+// }
 
 export function isWeekend(d: Date): boolean {
     const day = d.getDay(); // 0 Sun - 6 Sat

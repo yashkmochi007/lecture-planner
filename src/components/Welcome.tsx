@@ -1,18 +1,8 @@
-import type { Config } from "../types";
-
 interface WelcomeProps {
-  config: Config;
-  onConfigChange: (config: Config) => void;
   onImport: (file: File) => void;
-  onGeneratePlan: () => void;
 }
 
-export function Welcome({
-  config,
-  onConfigChange,
-  onImport,
-  onGeneratePlan,
-}: WelcomeProps) {
+export function Welcome({ onImport }: WelcomeProps) {
   return (
     <div className="lg:col-span-12 bg-white p-8 rounded-lg shadow-md text-center">
       <h2 className="text-xl font-semibold mb-4">Welcome to Lecture Planner</h2>

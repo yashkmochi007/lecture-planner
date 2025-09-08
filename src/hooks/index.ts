@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Config, Lecture, PlanDay } from '../types';
-import { defaultConfig, loadFromLocal, saveToLocal } from '../utils';
+import { defaultConfig, } from '../utils';
+  // loadFromLocal, saveToLocal 
 
 export function useLecturePlanner() {
   const [lectures, setLectures] = useState<Lecture[]>([]);
@@ -9,21 +10,21 @@ export function useLecturePlanner() {
 
   // Load initial from localStorage
   useEffect(() => {
-    const persisted = loadFromLocal();
-    if (persisted) {
-      setLectures(persisted.lectures || []);
-      setConfig(persisted.config || defaultConfig());
-      setPlan(persisted.plan || []);
-    } else {
-      // empty default
-      setLectures([]);
-    }
+    // const persisted = loadFromLocal();
+    // if (persisted) {
+    //   setLectures(persisted.lectures || []);
+    //   setConfig(persisted.config || defaultConfig());
+    //   setPlan(persisted.plan || []);
+    // } else {
+    //   // empty default
+    //   setLectures([]);
+    // }
   }, []);
 
   // Save to local whenever lectures or config change
-  useEffect(() => {
-    saveToLocal({ lectures, config, plan });
-  }, [lectures, config, plan]);
+  // useEffect(() => {
+  //   saveToLocal({ lectures, config, plan });
+  // }, [lectures, config, plan]);
 
   return {
     lectures,

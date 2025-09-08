@@ -13,8 +13,6 @@ interface LectureListProps {
 
 export function LectureList({
   lectures,
-  selectedIds,
-  onToggleSelect,
   onToggleCompleted,
   visibleCount,
   filteredLength,

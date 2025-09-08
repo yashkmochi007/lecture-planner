@@ -1,11 +1,11 @@
 interface LayoutProps {
   children: React.ReactNode;
-  title: string;
+  title?: string;
   subtitle?: string;
   error?: string;
 }
 
-export function Layout({ children, title, subtitle, error }: LayoutProps) {
+export function Layout({ children, error }: LayoutProps) {
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       {/* <header className="text-center">

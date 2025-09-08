@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import type {
   Config,
   Filter,
@@ -6,7 +6,7 @@ import type {
   PlanDay,
   RawLectureInput,
 } from "./types/index";
-import { formatId, sortLectures, isWeekend } from "./utils";
+import { sortLectures, isWeekend, defaultConfig } from "./utils";
 import { ConfigPanel } from "./components/ConfigPanel";
 import { FilterPanel } from "./components/FilterPanel";
 import { LectureList } from "./components/LectureList";
@@ -14,28 +14,49 @@ import { PlannerPanel } from "./components/PlannerPanel";
 import { Header } from "./components/Header";
 import { Layout } from "./components/Layout";
 import { LectureListHeader } from "./components/LectureListHeader";
-import { LectureActions } from "./components/LectureActions";
 import { Welcome } from "./components/Welcome";
+import { supabase } from "./supabaseClient";
+import { Auth } from "./components/Auth";
+import type { Session, User } from "@supabase/supabase-js";
 
-// Production-ready React component (default export)
-// - Tailwind CSS utility classes used for layout and styling
-// - Uses localStorage for persistence
-// - Upload / Import JSON, Export progress
-// - Sorts by module -> submodule
-// - Mark lectures completed, bulk actions
-// - Day-wise planner generator (configurable weekday/weekend hours & start date)
-// - Highlights "today's" lectures based on start date
-// - Progress dashboard and filters
-
-// NOTE: This file assumes you have Tailwind set up in your project.
-// To run:
-// 1. Create a React app (Vite or CRA)
-// 2. Ensure Tailwind is configured.
-// 3. Drop this file in src/ and import it in main.jsx / index.jsx.
-
-import { LOCAL_KEY, loadFromLocal, saveToLocal, defaultConfig } from "./utils";
-
+// Main App component that handles auth state
 export default function LecturePlannerApp() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const getSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setSession(session);
+      setLoading(false);
+    };
+
+    getSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return <div className="min-h-screen bg-gray-100 p-4">Loading...</div>;
+  }
+
+  if (!session) {
+    return <Auth />;
+  }
+
+  return <Planner key={session.user.id} user={session.user} />;
+}
+
+// Planner component, shown when user is logged in
+function Planner({ user }: { user: User }) {
   // App state
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [config, setConfig] = useState<Config>(defaultConfig());
@@ -55,31 +76,57 @@ export default function LecturePlannerApp() {
     } else {
       setVisibleCount(15);
     }
-  }, [filter.showCompleted]);
+  }, [filter.showCompleted, lectures.length]);
   // Track whether initial load is complete
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load initial from localStorage
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     try {
-      const persisted = loadFromLocal();
-      if (persisted) {
-        setLectures(sortLectures(persisted.lectures || []));
-        setConfig(persisted.config || defaultConfig());
-        setPlan(persisted.plan || []);
+      // Fetch profile which contains config
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("config")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError && profileError.code !== "PGRST116") {
+        // PGRST116: no rows found
+        throw profileError;
       }
-      setIsLoaded(true);
+      if (profile && profile.config) {
+        setConfig(profile.config);
+      }
+
+      // Fetch lectures
+      const { data: lecturesData, error: lecturesError } = await supabase
+        .from("lectures")
+        .select("*")
+        .eq("user_id", user.id);
+
+      if (lecturesError) throw lecturesError;
+      setLectures(
+        sortLectures(lecturesData || []).map((l, i) => ({ ...l, sr: i + 1 }))
+      );
+
+      // Fetch plan
+      const { data: planData, error: planError } = await supabase
+        .from("plan")
+        .select("*")
+        .eq("user_id", user.id);
+
+      if (planError) throw planError;
+      setPlan(planData || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
+    } finally {
       setIsLoaded(true);
     }
-  }, []);
+  }, [user.id]);
 
-  // Save to local whenever lectures or config change, but only after initial load
+  // Load initial from Supabase
   useEffect(() => {
-    if (!isLoaded) return; // Skip saving until initial load is complete
-    saveToLocal({ lectures, config, plan });
-  }, [lectures, config, plan, isLoaded]);
+    fetchData();
+  }, [fetchData]);
 
   // Derived values
   const totalDuration = useMemo(
@@ -98,64 +145,98 @@ export default function LecturePlannerApp() {
     [lectures]
   );
 
-  const toggleCompleted = (idx: number): void => {
-    setLectures((prev) => {
-      const copy = [...prev];
-      copy[idx] = { ...copy[idx], completed: !copy[idx].completed };
-      return sortLectures(copy); // Keep lectures sorted after state changes
+  const handleConfigChange = async (newConfig: Config) => {
+    setConfig(newConfig);
+    const { error } = await supabase.from("profiles").upsert({
+      id: user.id,
+      config: newConfig,
+      updated_at: new Date().toISOString(),
     });
-    setPlan((prev) => {
-      const dayPlans = prev.map((day) => {
-        const updatedLectures = day.lectures.map((l) => {
-          const toggledLecture =
-            l.module === lectures[idx].module &&
-            l.submodule === lectures[idx].submodule &&
-            l.topic === lectures[idx].topic;
-
-          if (toggledLecture) {
-            return { ...l, completed: !l.completed };
-          } else {
-            return l;
-          }
-        });
-        return { ...day, lectures: updatedLectures };
-      });
-      return dayPlans;
-    });
+    if (error) {
+      setError(error.message);
+      setConfig(config); // Revert on error
+    }
   };
 
-  const addLectures = (items: RawLectureInput[]): void => {
+  const toggleCompleted = async (lectureId: number) => {
+    const lecture = lectures.find((l) => l.id === lectureId);
+    if (!lecture) return;
+
+    const newCompletedStatus = !lecture.completed;
+
+    // Update Supabase first
+    const { error } = await supabase
+      .from("lectures")
+      .update({ completed: newCompletedStatus })
+      .eq("id", lectureId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      setError("Failed to update lecture status.");
+    } else {
+      await supabase.from("plan").delete().eq("user_id", user.id);
+      const planToInsert = plan.map(({ id, ...day }) => ({
+        ...day,
+        user_id: user.id,
+        lectures: day.lectures.map((l) =>
+          l.id === lectureId ? { ...l, completed: newCompletedStatus } : l
+        ),
+      }));
+      const { error: planError } = await supabase
+        .from("plan")
+        .insert(planToInsert);
+      // Update local state on success
+      if (planError) {
+        setError("Failed to update plan lecture status.");
+      } else {
+        setLectures((prev) =>
+          prev.map((l) =>
+            l.id === lectureId ? { ...l, completed: newCompletedStatus } : l
+          )
+        );
+        setPlan((prev) =>
+          prev.map((day) => ({
+            ...day,
+            lectures: day.lectures.map((l) =>
+              l.id === lectureId ? { ...l, completed: newCompletedStatus } : l
+            ),
+          }))
+        );
+      }
+    }
+  };
+
+  const addLectures = async (items: RawLectureInput[]) => {
     // Normalize items => ensure fields: module (int), submodule (int), topic, size, duration, completed
-    let normalized = items.map((it) => ({
-      sr: 0,
+    const normalized = items.map((it) => ({
       module: Number(it.module),
       submodule: Number(it.submodule),
       topic: it.topic || it.title || "Untitled",
       size: Number(it.size || it.size_mb || 0),
       duration: Number(it.duration || it.duration_hr || 0),
       completed: Boolean(it.completed || false),
+      user_id: user.id,
     }));
-    normalized = sortLectures(normalized);
-    normalized = normalized.map((l, i) => ({ ...l, sr: i + 1 }));
 
-    setLectures((prev) => sortLectures([...prev, ...normalized]));
+    const { error } = await supabase.from("lectures").insert(normalized);
+
+    if (error) {
+      setError(error.message);
+    } else {
+      // Refetch all data to ensure consistency and get new IDs
+      await fetchData();
+    }
   };
 
-  const clearAll = () => {
-    if (!confirm("Clear all lectures and progress? This cannot be undone."))
+  const clearAll = async () => {
+    if (!confirm("Clear all lectures and progress? This cannot be undone.")) {
       return;
-    // Clear in-memory state
+    }
+    await supabase.from("plan").delete().eq("user_id", user.id);
+    await supabase.from("lectures").delete().eq("user_id", user.id);
     setLectures([]);
-    setConfig(defaultConfig());
     setPlan([]);
     setSelectedIds(new Set());
-
-    // Remove persisted state
-    try {
-      localStorage.removeItem(LOCAL_KEY);
-    } catch (e) {
-      console.error("Failed to remove local state", e);
-    }
   };
 
   // File import (JSON) handler
@@ -183,20 +264,27 @@ export default function LecturePlannerApp() {
 
   // Export current lectures + config
   const onExport = () => {
-    const payload = { lectures, config, exportedAt: new Date().toISOString() };
+    const payload = {
+      lectures,
+      config,
+      plan,
+      exportedAt: new Date().toISOString(),
+    };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `lecture_planner_export_${new Date().toISOString()}.json`;
+    a.download = `lecture_planner_export_${
+      user.id
+    }_${new Date().toISOString()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   // Planner generator
-  const generatePlan = (opts: Partial<Config> = {}) => {
+  const generatePlan = async (opts: Partial<Config> = {}) => {
     const cfg = { ...config, ...opts };
     console.log("Generating plan with config:", {
       weekdayHours: cfg.weekdayHours,
@@ -230,7 +318,7 @@ export default function LecturePlannerApp() {
         ptr++;
       }
 
-      const myObj = {
+      const myObj: PlanDay = {
         date: curDate.toISOString().slice(0, 10),
         isWeekend: dayIsWeekend,
         capacity: todayHours,
@@ -246,6 +334,22 @@ export default function LecturePlannerApp() {
     }
 
     setPlan(res);
+
+    // Save to Supabase
+    await supabase.from("plan").delete().eq("user_id", user.id);
+    if (res.length > 0) {
+      const planToInsert = res.map(({ id, ...p }) => ({
+        ...p,
+        user_id: user.id,
+      }));
+      console.log(JSON.stringify(planToInsert));
+      const { error: planError } = await supabase
+        .from("plan")
+        .insert(planToInsert);
+      if (planError) {
+        setError(planError.message);
+      }
+    }
   };
 
   // Bulk actions
@@ -256,13 +360,6 @@ export default function LecturePlannerApp() {
       else copy.add(key);
       return copy;
     });
-  };
-
-  const removeSelected = () => {
-    if (selectedIds.size === 0) return;
-    if (!confirm("Remove selected lectures?")) return;
-    setLectures((prev) => prev.filter((l) => !selectedIds.has(formatId(l))));
-    setSelectedIds(new Set());
   };
 
   // Quick-add demo (for testing large lists)
@@ -306,32 +403,42 @@ export default function LecturePlannerApp() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const todaysInPlan = plan.find((p) => p.date === todayIso) || null;
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
-    <Layout
-      title="Lecture Planner"
-      subtitle="Plan your lecture watching schedule"
-      error={error}
-    >
+    <Layout error={error}>
       <Header
         onQuickAdd={() => quickAddDemo(500)}
         onExport={onExport}
         onClear={clearAll}
       />
+      <div className="flex justify-between items-center mb-4">
+        <p className="text-slate-600">
+          Signed in as: <strong>{user.email}</strong>
+        </p>
+        <button
+          onClick={handleSignOut}
+          className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+        >
+          Sign Out
+        </button>
+      </div>
 
       <main className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-8">
-        {lectures.length === 0 ? (
-          <Welcome
-            config={config}
-            onConfigChange={setConfig}
-            onImport={onFileImport}
-            onGeneratePlan={generatePlan}
-          />
+        {!isLoaded ? (
+          <div className="lg:col-span-12 text-center p-8">
+            Loading your planner...
+          </div>
+        ) : lectures.length === 0 ? (
+          <Welcome onImport={onFileImport} />
         ) : (
           <>
             <div className="lg:col-span-3">
               <ConfigPanel
                 config={config}
-                onConfigChange={setConfig}
+                onConfigChange={handleConfigChange}
                 onImport={onFileImport}
                 onGeneratePlan={generatePlan}
               />
@@ -368,14 +475,10 @@ export default function LecturePlannerApp() {
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
                   onToggleCompleted={(idx) => {
-                    const realIdx = lectures.findIndex(
-                      (x) =>
-                        x.module === visibleLectures[idx].module &&
-                        x.submodule === visibleLectures[idx].submodule &&
-                        x.topic === visibleLectures[idx].topic
-                    );
-                    if (realIdx >= 0) toggleCompleted(realIdx);
-                    // generatePlan(); // Regenerate plan when completion status changes
+                    const lectureToToggle = visibleLectures[idx];
+                    if (lectureToToggle && lectureToToggle.id) {
+                      toggleCompleted(lectureToToggle.id);
+                    }
                   }}
                   visibleCount={visibleCount}
                   filteredLength={filteredLectures.length}

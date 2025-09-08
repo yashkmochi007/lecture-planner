@@ -1,47 +1,45 @@
+export interface RawLectureInput {
+  module: number | string;
+  submodule: number | string;
+  topic?: string;
+  title?: string;
+  size?: number | string;
+  size_mb?: number | string;
+  duration?: number | string;
+  duration_hr?: number | string;
+  completed?: boolean;
+}
+
 export interface Lecture {
-    sr: number;
-    module: number;
-    submodule: number;
-    topic: string;
-    size: number;
-    duration: number;
-    completed: boolean;
+  id?: number; // From Supabase
+  user_id?: string; // From Supabase
+  sr: number;
+  module: number;
+  submodule: number;
+  topic: string;
+  size: number;
+  duration: number;
+  completed: boolean;
 }
 
 export interface Config {
-    weekdayHours: number;
-    weekendHours: number;
-    startDate: string;
+  weekdayHours: number;
+  weekendHours: number;
+  startDate: string;
 }
 
 export interface PlanDay {
-    date: string;
-    isWeekend: boolean;
-    capacity: number;
-    used: number;
-    lectures: Lecture[];
+  id?: number; // From Supabase
+  user_id?: string; // From Supabase
+  date: string;
+  isWeekend: boolean;
+  capacity: number;
+  used: number;
+  lectures: Lecture[];
 }
 
 export interface Filter {
-    q: string;
-    showCompleted: boolean;
-    module: string;
-}
-
-export interface StoredState {
-    lectures: Lecture[];
-    config: Config;
-    plan: PlanDay[];
-}
-
-export interface RawLectureInput {
-    module: string | number;
-    submodule: string | number;
-    topic?: string;
-    title?: string;
-    size?: number;
-    size_mb?: number;
-    duration?: number;
-    duration_hr?: number;
-    completed?: boolean;
+  q: string;
+  showCompleted: boolean;
+  module: string;
 }
