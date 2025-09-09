@@ -291,6 +291,18 @@ function Planner({ user }: { user: User }) {
       weekendHours: cfg.weekendHours,
       startDate: cfg.startDate,
     });
+    if (cfg.weekdayHours <= 0 && cfg.weekendHours <= 0) {
+      alert("Please set positive hours for weekdays and/or weekends.");
+      return;
+    }
+    if (cfg.weekdayHours > 24 || cfg.weekendHours > 24) {
+      alert("Hours per day cannot exceed 24.");
+      return;
+    }
+    if (isNaN(new Date(cfg.startDate).getTime())) {
+      alert("Please set a valid start date.");
+      return;
+    }
 
     // pick unfinished lectures in sorted order
     const remaining = sortLectures(lectures.filter((l) => !l.completed));

@@ -164,6 +164,9 @@ export function PlannerPanel({
         <div className="space-y-2 mt-2 text-sm">
           {plan
             .filter((p) => new Date(p.date) > new Date())
+            .sort(
+              (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+            )
             .map((d, i) => (
               <div key={i} className="p-2 border rounded">
                 <div className="flex justify-between">
