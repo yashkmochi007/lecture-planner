@@ -109,7 +109,10 @@ export function PlannerPanel({
           <div className="mt-2 border rounded p-2 shadow-sm">
             <div className="text-sm text-slate-500">
               Date: {todaysInPlan.date} (
-              {todaysInPlan.isWeekend ? "Weekend" : "Weekday"})&nbsp;&nbsp; (
+              {new Date(todaysInPlan.date).toLocaleDateString("en-US", {
+                weekday: "long",
+              })}
+              ) &nbsp;&nbsp; (
               {convertDecimalHoursToHHMM(
                 todaysInPlan.lectures
                   .filter((l) => l.completed)
@@ -137,6 +140,11 @@ export function PlannerPanel({
                 lectures
               </strong>
             </div>
+            {todaysInPlan.lectures.filter((l) => !l.completed).length === 0 && (
+              <div className="mt-1 text-xs text-slate-600">
+                {todaysInPlan.lectures.map((x) => formatId(x)).join(", ")}
+              </div>
+            )}
             <ul className="mt-2 ml-4 list-disc text-sm">
               {todaysInPlan.lectures.length === 0 ? (
                 <li>No lectures scheduled today</li>
@@ -158,7 +166,6 @@ export function PlannerPanel({
           </div>
         )}
       </div>
-
       <div className="mt-4">
         <h3 className="font-medium">Upcoming</h3>
         <div className="space-y-2 mt-2 text-sm">
@@ -167,29 +174,112 @@ export function PlannerPanel({
             .sort(
               (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
             )
-            .map((d, i) => (
-              <div key={i} className="p-2 border rounded">
-                <div className="flex justify-between">
-                  <div>
-                    {d.date} (
-                    {new Date(d.date).toLocaleDateString("en-US", {
-                      weekday: "long",
-                    })}
-                    )
+            .map((d, i) => {
+              if (
+                plan
+                  .filter(
+                    (p) =>
+                      new Date(p.date) >=
+                        new Date(new Date().setHours(0, 0, 0, 0)) &&
+                      p.lectures.some((l) => !l.completed)
+                  )
+                  .sort(
+                    (a, b) =>
+                      new Date(a.date).getTime() - new Date(b.date).getTime()
+                  )
+                  .shift()?.date === d.date
+              ) {
+                return (
+                  <div className="mt-2 border rounded p-2 shadow-sm">
+                    <div className="text-sm text-slate-500">
+                      Date: {d.date} (
+                      {new Date(d.date).toLocaleDateString("en-US", {
+                        weekday: "long",
+                      })}
+                      ) &nbsp;&nbsp; (
+                      {convertDecimalHoursToHHMM(
+                        d.lectures
+                          .filter((l) => l.completed)
+                          .reduce(
+                            (prev, curr) => prev + (curr.duration || 0),
+                            0
+                          )
+                      )}
+                      /
+                      {convertDecimalHoursToHHMM(
+                        d.lectures.reduce(
+                          (prev, curr) => prev + (curr.duration || 0),
+                          0
+                        )
+                      )}{" "}
+                      hrs) ({d.lectures.filter((l) => l.completed).length}/
+                      {d.lectures.length} lectures)
+                    </div>
+                    <div className="text-sm text-slate-500 mt-1">
+                      <strong>
+                        Pending:{" "}
+                        {convertDecimalHoursToHHMM(
+                          d.lectures
+                            .filter((l) => !l.completed)
+                            .reduce(
+                              (prev, curr) => prev + (curr.duration || 0),
+                              0
+                            )
+                        )}{" "}
+                        hrs - {d.lectures.filter((l) => !l.completed).length}{" "}
+                        lectures
+                      </strong>
+                    </div>
+                    <ul className="mt-2 ml-4 list-disc text-sm">
+                      {d.lectures.length === 0 ? (
+                        <li>No lectures scheduled today</li>
+                      ) : (
+                        d.lectures
+                          .filter((x) => !x.completed)
+                          .map((l, i) => (
+                            <li key={i}>
+                              {formatId(l)} - {l.topic} (
+                              {convertDecimalHoursToHHMM(l.duration || 0)})
+                            </li>
+                          ))
+                      )}
+                    </ul>
                   </div>
-                  <div>
-                    {convertDecimalHoursToHHMM(d.used)}/{d.capacity} (
-                    {d.lectures.length} lectures)
+                );
+              } else {
+                return (
+                  <div key={i} className="p-2 border rounded">
+                    <div className="text-sm text-slate-500">
+                      Date: {d.date} (
+                      {new Date(d.date).toLocaleDateString("en-US", {
+                        weekday: "long",
+                      })}
+                      ) &nbsp;&nbsp; (
+                      {convertDecimalHoursToHHMM(
+                        d.lectures
+                          .filter((l) => l.completed)
+                          .reduce(
+                            (prev, curr) => prev + (curr.duration || 0),
+                            0
+                          )
+                      )}
+                      /
+                      {convertDecimalHoursToHHMM(
+                        d.lectures.reduce(
+                          (prev, curr) => prev + (curr.duration || 0),
+                          0
+                        )
+                      )}{" "}
+                      hrs) ({d.lectures.filter((l) => l.completed).length}/
+                      {d.lectures.length} lectures)
+                    </div>
+                    <div className="mt-1 text-xs text-slate-600">
+                      {d.lectures.map((x) => formatId(x)).join(", ")}
+                    </div>
                   </div>
-                </div>
-                <div className="mt-1 text-xs text-slate-600">
-                  {d.lectures
-                    .filter((x) => !x.completed)
-                    .map((x) => formatId(x))
-                    .join(", ")}
-                </div>
-              </div>
-            ))}
+                );
+              }
+            })}
         </div>
       </div>
 
