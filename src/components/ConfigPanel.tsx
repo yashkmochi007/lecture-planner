@@ -73,7 +73,7 @@ export function ConfigPanel({
         >
           Generate Plan
         </button>
-        <button
+        {/* <button
           className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
           onClick={() => {
             onGeneratePlan();
@@ -81,7 +81,7 @@ export function ConfigPanel({
           }}
         >
           Generate & Scroll Up
-        </button>
+        </button> */}
       </div>
     </div>
   );

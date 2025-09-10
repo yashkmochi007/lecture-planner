@@ -18,6 +18,7 @@ import { Welcome } from "./components/Welcome";
 import { supabase } from "./supabaseClient";
 import { Auth } from "./components/Auth";
 import type { Session, User } from "@supabase/supabase-js";
+import FullScreenSpinner from "./components/FullScreenSpinner";
 
 // Main App component that handles auth state
 export default function LecturePlannerApp() {
@@ -63,6 +64,7 @@ function Planner({ user }: { user: User }) {
   const [plan, setPlan] = useState<PlanDay[]>([]);
   const [visibleCount, setVisibleCount] = useState(15);
   const [error, setError] = useState<string>("");
+  const [loaderCount, setLoaderCount] = useState(0);
   const [filter, setFilter] = useState<Filter>({
     q: "",
     showCompleted: false,
@@ -163,7 +165,7 @@ function Planner({ user }: { user: User }) {
     if (!lecture) return;
 
     const newCompletedStatus = !lecture.completed;
-
+    setLoaderCount((count) => count + 1);
     // Update Supabase first
     const { error } = await supabase
       .from("lectures")
@@ -172,8 +174,10 @@ function Planner({ user }: { user: User }) {
       .eq("user_id", user.id);
 
     if (error) {
+      setLoaderCount((count) => count - 1);
       setError("Failed to update lecture status.");
     } else {
+      setLoaderCount((count) => count + 1);
       await supabase.from("plan").delete().eq("user_id", user.id);
       const planToInsert = plan.map(({ id, ...day }) => ({
         ...day,
@@ -187,6 +191,7 @@ function Planner({ user }: { user: User }) {
         .insert(planToInsert);
       // Update local state on success
       if (planError) {
+        setLoaderCount((count) => count - 1);
         setError("Failed to update plan lecture status.");
       } else {
         setLectures((prev) =>
@@ -202,6 +207,7 @@ function Planner({ user }: { user: User }) {
             ),
           }))
         );
+        setLoaderCount((count) => count - 2);
       }
     }
   };
@@ -314,7 +320,7 @@ function Planner({ user }: { user: User }) {
     // starting date from cfg.startDate
     let curDate = new Date(cfg.startDate);
     if (isNaN(curDate.getTime())) curDate = new Date();
-
+    setLoaderCount((count) => count + 1);
     while (ptr < remaining.length) {
       const dayIsWeekend = isWeekend(curDate);
       const todayHours = dayIsWeekend ? cfg.weekendHours : cfg.weekdayHours;
@@ -358,7 +364,9 @@ function Planner({ user }: { user: User }) {
       const { error: planError } = await supabase
         .from("plan")
         .insert(planToInsert);
+      setLoaderCount((count) => count - 1);
       if (planError) {
+        setLoaderCount((count) => count - 1);
         setError(planError.message);
       }
     }
@@ -421,6 +429,7 @@ function Planner({ user }: { user: User }) {
 
   return (
     <Layout error={error}>
+      <FullScreenSpinner isVisible={loaderCount > 0} message="Updating..." />
       <Header
         onQuickAdd={() => quickAddDemo(500)}
         onExport={onExport}
