@@ -126,7 +126,9 @@ export function PlannerPanel({
                 )
               )}{" "}
               hrs) ({todaysInPlan.lectures.filter((l) => l.completed).length}/
-              {todaysInPlan.lectures.length} lectures)
+              {todaysInPlan.lectures.length} lectures) -{" "}
+              {todaysInPlan.lectures[0].sr} to{" "}
+              {todaysInPlan.lectures.slice(-1)[0].sr}
             </div>
             <div className="text-sm text-slate-500 mt-1">
               <strong>
@@ -213,7 +215,8 @@ export function PlannerPanel({
                         )
                       )}{" "}
                       hrs) ({d.lectures.filter((l) => l.completed).length}/
-                      {d.lectures.length} lectures)
+                      {d.lectures.length} lectures) - {d.lectures[0].sr} to{" "}
+                      {d.lectures.slice(-1)[0].sr}
                     </div>
                     <div className="text-sm text-slate-500 mt-1">
                       <strong>
@@ -271,7 +274,8 @@ export function PlannerPanel({
                         )
                       )}{" "}
                       hrs) ({d.lectures.filter((l) => l.completed).length}/
-                      {d.lectures.length} lectures)
+                      {d.lectures.length} lectures) - {d.lectures[0]?.sr} to{" "}
+                      {d.lectures.slice(-1)[0]?.sr}
                     </div>
                     <div className="mt-1 text-xs text-slate-600">
                       {d.lectures.map((x) => formatId(x)).join(", ")}

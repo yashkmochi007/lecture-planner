@@ -68,7 +68,7 @@ export function ConfigPanel({
 
       <div className="flex gap-2">
         <button
-          className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 w-full"
           onClick={onGeneratePlan}
         >
           Generate Plan
